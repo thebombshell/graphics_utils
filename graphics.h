@@ -2,9 +2,9 @@
 #ifndef SMOL_GRAPHICS_H
 #define SMOL_GRAPHICS_H
 
-#include "window.h"
+#include <window.h>
 #include "glad.h"
-#include "data_structures.h"
+#include <data_structures.h>
 
 /** @struct		graphics
  *	@brief		a struct containign graphical context information
@@ -12,12 +12,17 @@
  *	@member		graphics::device - the device the graphical context is bound to
  *	@member		graphics::context - the graphical context
  */
-typedef struct {
-	
+typedef struct 
+{	
 	window* surface;
 	HDC device;
 	HGLRC context;
 } graphics;
+
+
+/** returns the graphics error string
+ */
+const char* graphics_get_error_string();
 
 /** returns nonzero if the given graphics is valid
  *	@memberof	graphics

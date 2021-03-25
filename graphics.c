@@ -1,10 +1,10 @@
 
 #include "graphics.h"
 
-#include "log.h"
 #include "lode_png.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <GL/wglext.h>
 
 const PIXELFORMATDESCRIPTOR g_pixel_format_descriptor = {
@@ -18,6 +18,15 @@ const int g_graphics_attributes[7] =
     , WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB
 	, 0
 	};
+
+static char g_graphics_error[1024];
+
+const char* graphics_get_error_string()
+{
+	return g_graphics_error;
+}
+
+#define GRAPHICS_ERROR(...) { sprintf(g_graphics_error, __VA_ARGS__); }
 
 int graphics_is_valid(graphics* t_graphics) {
 	
@@ -39,7 +48,7 @@ int init_graphics(graphics* t_graphics, window* t_window) {
 	pixel_format = ChoosePixelFormat(t_graphics->device, &g_pixel_format_descriptor);
 	if (!SetPixelFormat(t_graphics->device, pixel_format, &g_pixel_format_descriptor)) {
 		
-		ERR("failed to set pixel format");
+		GRAPHICS_ERROR("failed to set pixel format");
 		return 0;
 	}
 	
@@ -49,20 +58,20 @@ int init_graphics(graphics* t_graphics, window* t_window) {
 	wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
 	if (!wglCreateContextAttribsARB) {
 		
-		ERR("failed to load wglCreateContextAttribsARB: %ld", GetLastError());
+		GRAPHICS_ERROR("failed to load wglCreateContextAttribsARB: %ld", GetLastError());
 		return 0;
 	}
 	
 	wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress("wglChoosePixelFormatARB");
 	if (!wglChoosePixelFormatARB) {
 		
-		ERR("failed to load wglChoosePixelFormatARB: %ld", GetLastError());
+		GRAPHICS_ERROR("failed to load wglChoosePixelFormatARB: %ld", GetLastError());
 		return 0;
 	}
 	
 	if (!gladLoadGL()) {
 		
-		ERR("failed to load gl via glad");
+		GRAPHICS_ERROR("failed to load gl via glad");
 		return 0;
 	}
 	wglMakeCurrent(0, 0);
@@ -71,12 +80,12 @@ int init_graphics(graphics* t_graphics, window* t_window) {
 	t_graphics->context = wglCreateContextAttribsARB(t_graphics->device, 0, &g_graphics_attributes[0]);
 	if (!t_graphics->context) {
 		
-		ERR("failed to create graphics context");
+		GRAPHICS_ERROR("failed to create graphics context");
 		return 0;
 	}
 	
 	wglMakeCurrent(t_graphics->device, t_graphics->context);
-	LOG( "OpenGL %s - glsl %s - %s - %s"
+	GRAPHICS_ERROR("OpenGL %s - glsl %s - %s - %s"
 		, glGetString(GL_VERSION)
 		, glGetString(GL_SHADING_LANGUAGE_VERSION)
 		, glGetString(GL_VENDOR)
@@ -121,7 +130,7 @@ int init_shader
 		
 		glGetShaderInfoLog(t_shader->id, 1024, &err_length, err_log);
 		
-		ERR("failed to compile %s shader: %s\n", t_shader_type == GL_FRAGMENT_SHADER ? "fragment" : "vertex", err_log);
+		GRAPHICS_ERROR("failed to compile %s shader: %s\n", t_shader_type == GL_FRAGMENT_SHADER ? "fragment" : "vertex", err_log);
 		
 		glDeleteShader(t_shader->id);
 		
@@ -170,7 +179,7 @@ int init_program(program* t_program, unsigned int t_shader_count, shader** t_sha
 		
 		glGetProgramInfoLog(t_program->id, 1024, &err_length, err_log);
 		
-		ERR("failed to link program: %s\n", err_log);
+		GRAPHICS_ERROR("failed to link program: %s\n", err_log);
 		
 		glDeleteProgram(t_program->id);
 		
@@ -377,7 +386,7 @@ int load_texture(texture* t_texture, const char* t_filepath) {
 	unsigned int error = lodepng_decode32_file((unsigned char**)&t_texture->buffer, &t_texture->width, &t_texture->height, filepath);
 	if (error) {
 		
-		ERR("failed to load texture: %s", lodepng_error_text(error));
+		GRAPHICS_ERROR("failed to load texture: %s", lodepng_error_text(error));
 		
 		return 0;
 	}
@@ -430,7 +439,7 @@ int texture_save(texture* t_texture, const char* t_filepath) {
 	unsigned int error = lodepng_encode32_file(t_filepath, (unsigned char*)t_texture->buffer, t_texture->width, t_texture->height);
 	if (error) {
 		
-		ERR("failed to save texture: %s", lodepng_error_text(error));
+		GRAPHICS_ERROR("failed to save texture: %s", lodepng_error_text(error));
 		
 		return 0;
 	}
