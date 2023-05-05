@@ -693,19 +693,19 @@ int fbx_stringify_node(fbx_node_record* t_node, vector* t_string)
 			case 'L':
 			{
 				long long int value = *((long long int*)property->data.data);
-				sprintf(temp, "%ll", value);
+				sprintf(temp, "%lli", value);
 				result = fbx_string_push(t_string, temp);
 			} break;
 			case 'F':
 			{
 				double value = (double)*((float*)property->data.data);
-				sprintf(temp, "%L.4", value);
+				sprintf(temp, "%Lf.4", value);
 				result = fbx_string_push(t_string, temp);
 			} break;
 			case 'D':
 			{
 				double value = *((double*)property->data.data);
-				sprintf(temp, "%L.4", value);
+				sprintf(temp, "%Lf.4", value);
 				result = fbx_string_push(t_string, temp);
 			} break;
 			case 'b':

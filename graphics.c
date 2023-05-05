@@ -19,7 +19,7 @@ const int g_graphics_attributes[7] =
 	, 0
 	};
 
-static char g_graphics_error[1024];
+static char g_graphics_error[2048];
 
 const char* graphics_get_error_string()
 {
