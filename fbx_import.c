@@ -19,6 +19,10 @@
 #define FBX_DEBUG_LOG_LOAD 0
 #endif
 
+#ifndef FBX_DEBUG_LOG_STRINGIFY
+#define FBX_DEBUG_LOG_STRINGIFY 0
+#endif
+
 #ifndef FBX_DEBUG_LOG_FINAL
 #define FBX_DEBUG_LOG_FINAL 0
 #endif
@@ -52,13 +56,13 @@
 
 #define FBX_LOG(...) FBX_LOG_DEFINITION(__VA_ARGS__) 
 
-#if FBX_DEBUG && FBX_DEBUG_STACK_COUNT
+#if FBX_DEBUG && FBX_DEBUG_STACK_COUNT 
 #define FBX_STACK_COUNT(T_COUNT, ...) { int FBX_STACK_COUNT_INT = T_COUNT; for (; FBX_STACK_COUNT_INT; --FBX_STACK_COUNT_INT) printf(">"); printf(" " __VA_ARGS__); printf("\n"); }
 #else
 #define FBX_STACK_COUNT(T_COUNT, ...) FBX_NOP
 #endif
 
-#if FBX_DEBUG && FBX_DEBUG_PROPERTY
+#if FBX_DEBUG && FBX_DEBUG_PROPERTY 
 #define FBX_PROPERTY_LOG(...) FBX_LOG(__VA_ARGS__)
 #else
 #define FBX_PROPERTY_LOG(...) FBX_NOP
@@ -67,7 +71,7 @@
 #define FBX_LOAD_ERR_MESSAGE() (FBX_LOG("FBX FAILURE"))
 
 #ifndef FBX_LOG_VERBOSE
-#define FBX_LOG_VERBOSE FBX_NOP
+#define FBX_LOG_VERBOSE(...) FBX_NOP
 #endif
 
 #if !FBX_DEBUG_LOG_LOAD
@@ -160,7 +164,7 @@ int fread_property(FILE* t_file, fbx_property* t_property, size_t t_element_size
 	int have = fread(value, 1, t_element_size, t_file);
 	if (have != t_element_size)
 	{
-		FBX_LOG("have %i does not equal element size %z", have, t_element_size);
+		FBX_LOG("have %i does not equal element size %u", have, (unsigned int)t_element_size);
 		return 0;
 	}
 	int result = buffer_init(&t_property->data, t_element_size);
@@ -358,13 +362,16 @@ int fbx_load(fbx* t_fbx, const char* t_string)
 		have = fread(&node->header, 1, 13, file);
 		if (have != 13)
 		{
-			return FBX_LOAD_FAILURE();
+			return FBX_LOAD_FAILURE(); /* not enough to fill a header */
 		}
+		
+		/* if a node header is 0, 0, 0, 0, then it is denoting the end of a child array */
 		if (!node->header.end_offset && !node->header.num_properties && !node->header.property_list_length && !node->header.name_length)
 		{
 			vector_remove(&node_stack, node_stack.element_count - 1);
 			vector_remove(&t_fbx->nodes, node_index);
 			
+			/* the last element should be 0, 0, 0, 0, denoting the end of file, as the file is a root child array */
 			if (!node_stack.element_count)
 			{
 				FBX_LOG("\tEnd Of File at %li out of %li", (long int)ftell(file), (long int)file_length);
@@ -378,7 +385,9 @@ int fbx_load(fbx* t_fbx, const char* t_string)
 			
 			goto node_pop_stack;
 		}
-		if (node_stack.element_count == 0)
+		
+		/* when element_count is 1, we are looking at a root node */
+		if (node_stack.element_count == 1)
 		{
 			vector_push(&t_fbx->root_nodes, &node_index);
 		}
@@ -617,6 +626,14 @@ node_pop_stack:
 	return 1;
 }
 
+#if !FBX_DEBUG_LOG_STRINGIFY
+#undef FBX_LOG
+#define FBX_LOG(...) FBX_NOP
+#else
+#undef FBX_LOG
+#define FBX_LOG(...) FBX_LOG_DEFINITION(__VA_ARGS__)
+#endif
+
 int fbx_string_push(vector* t_vector, const char* t_string)
 {
 	if (!t_vector || !t_string)
@@ -625,7 +642,7 @@ int fbx_string_push(vector* t_vector, const char* t_string)
 	}
 	
 	const char* c = t_string; 
-	while ((*c) != '\0')
+	for (; (*c) != '\0'; ++c)
 	{
 		int result = vector_push(t_vector, c);
 		if (!result)
@@ -637,18 +654,44 @@ int fbx_string_push(vector* t_vector, const char* t_string)
 	return 1;
 }
 
-int fbx_stringify_node(fbx_node_record* t_node, vector* t_string)
+int fbx_string_push_limit(vector* t_vector, const char* t_string, unsigned int t_char_limit)
+{
+	if (!t_vector || !t_string)
+	{
+		return 0;
+	}
+	
+	const char* c = t_string; 
+	unsigned int i = 0;
+	for (; i < t_char_limit && (*c) != '\0'; ++c, ++i)
+	{
+		int result = vector_push(t_vector, c);
+		if (!result)
+		{
+			return 0;
+		}
+	}
+	
+	return 1;
+}
+
+int fbx_stringify_node(fbx_node_record* t_node, vector* t_nodes, vector* t_string)
 {
 	if (!t_node || !t_string)
 	{
 		return 0;
 	}
 	
+	FBX_LOG("stringify node \"%s\" entered", (char*)t_node->name.data);
+	
 	int result = fbx_string_push(t_string, (char*)t_node->name.data);
 	if (!result)
 	{
 		return 0;
 	}
+	
+	FBX_LOG("stringify count");
+	
 	if (t_node->properties.element_count || t_node->children.element_count)
 	{
 		result = fbx_string_push(t_string, " : ");
@@ -657,6 +700,9 @@ int fbx_stringify_node(fbx_node_record* t_node, vector* t_string)
 			return 0;
 		}
 	}
+	
+	FBX_LOG("stringify properties");
+	
 	int i = 0;
 	for (; i < t_node->properties.element_count; ++i)
 	{
@@ -745,14 +791,10 @@ int fbx_stringify_node(fbx_node_record* t_node, vector* t_string)
 				{
 					return 0;
 				}
-				int k = 0;
-				for (; k < property->data.size; ++k)
+				result = fbx_string_push_limit(t_string, ((char*)property->data.data), property->data.size);
+				if (!result)
 				{
-					result = vector_push(t_string, ((char*)property->data.data) + k);
-					if (!result)
-					{
-						return 0;
-					}
+					return 0;
 				}
 				result = fbx_string_push(t_string, "\"");
 				if(!result)
@@ -772,6 +814,7 @@ int fbx_stringify_node(fbx_node_record* t_node, vector* t_string)
 		}
 	}
 	
+	
 	if (t_node->children.element_count)
 	{
 		result = fbx_string_push(t_string, " {\n");
@@ -782,8 +825,9 @@ int fbx_stringify_node(fbx_node_record* t_node, vector* t_string)
 		i = 0;
 		for (; i < t_node->children.element_count; ++i)
 		{
-			fbx_node_record* child = (fbx_node_record*)vector_get_index(&t_node->children, i);
-			result = fbx_stringify_node(child, t_string);
+			unsigned int child_index = *((unsigned int*)vector_get_index(&t_node->children, i));
+			fbx_node_record* child = (fbx_node_record*)vector_get_index(t_nodes, child_index);
+			result = fbx_stringify_node(child, t_nodes, t_string);
 			if (!result)
 			{
 				return 0;
@@ -803,15 +847,19 @@ int fbx_stringify_node(fbx_node_record* t_node, vector* t_string)
 		return 0;
 	}
 	
+	FBX_LOG("stringify node exited");
+	
 	return 1;
 }
 
 int fbx_stringify(fbx* t_fbx, buffer* t_out_buffer)
 {
-	if (!t_fbx || t_out_buffer)
+	if (!t_fbx || !t_out_buffer)
 	{
 		return 0;
 	}
+	
+	FBX_LOG("stringify entered");
 	
 	vector string;
 	int result = vector_init(&string, 1);
@@ -823,16 +871,23 @@ int fbx_stringify(fbx* t_fbx, buffer* t_out_buffer)
 	fbx_node_record* node = 0;
 	int i = 0;
 	
+	
+	FBX_LOG("stringify entering record");
+	
 	for (; i < t_fbx->root_nodes.element_count; ++i)
 	{
+		FBX_LOG("stringify element %i", i);
+		
 		node = (fbx_node_record*)vector_get_index(&t_fbx->nodes, *((int*)vector_get_index(&t_fbx->root_nodes, i)));
 		
-		result = fbx_stringify_node(node, &string);
+		result = fbx_stringify_node(node, &t_fbx->nodes, &string);
 		if (!result)
 		{
 			goto stringify_fail;
 		}
 	}
+	
+	FBX_LOG("stringify exiting record");
 	
 	char null_term = '\0';
 	result = vector_push(&string, &null_term);
@@ -840,11 +895,14 @@ int fbx_stringify(fbx* t_fbx, buffer* t_out_buffer)
 	if (!result)
 	{
 stringify_fail:
+		FBX_LOG("stringify failed");
 		vector_final(&string);
 		return 0;
 	}
 	
 	*t_out_buffer = string.buffer;
+	
+	FBX_LOG("stringify exited");
 	
 	return 1;
 }
@@ -895,13 +953,13 @@ void fbx_final(fbx* t_fbx)
 				}
 				buffer_final(&property->data);
 			}
-			FBX_LOG_VERBOSE("removing name");
+			FBX_LOG("removing name");
 			buffer_final(&node->name);
-			FBX_LOG_VERBOSE("removing properties");
+			FBX_LOG("removing properties");
 			vector_final(&node->properties);
-			FBX_LOG_VERBOSE("removing children");
+			FBX_LOG("removing children");
 			vector_final(&node->children);
-			FBX_LOG_VERBOSE("removing node");
+			FBX_LOG("removing node");
 			vector_remove(&t_fbx->nodes, t_fbx->nodes.element_count - 1);
 		}
 		vector_final(&t_fbx->nodes);
