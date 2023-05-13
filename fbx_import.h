@@ -53,7 +53,13 @@ typedef struct
 
 int fbx_load(fbx* t_fbx, const char* t_string);
 
+int fbx_stringify_property(fbx_property* t_property, vector* t_string);
+
+int fbx_stringify_node(fbx_node_record* t_node, vector* t_nodes, vector* t_string, unsigned int t_should_stringify_properties);
+
 int fbx_stringify(fbx* t_fbx, buffer* t_out_buffer);
+
+int fbx_stringify_without_properties(fbx* t_fbx, buffer* t_out_buffer);
 
 void fbx_final(fbx* t_fbx);
 

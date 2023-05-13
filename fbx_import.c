@@ -675,7 +675,106 @@ int fbx_string_push_limit(vector* t_vector, const char* t_string, unsigned int t
 	return 1;
 }
 
-int fbx_stringify_node(fbx_node_record* t_node, vector* t_nodes, vector* t_string)
+int fbx_stringify_property(fbx_property* t_property, vector* t_string)
+{
+	char temp[256];
+	int result = 1;
+	switch (t_property->typecode)
+	{
+		case 'C':
+		{
+			int value = (int)*((char*)t_property->data.data);
+			sprintf(temp, "%i", value);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'Y':
+		{
+			int value = (int)*((short*)t_property->data.data);
+			sprintf(temp, "%i", value);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'I':
+		{
+			int value = *((int*)t_property->data.data);
+			sprintf(temp, "%i", value);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'L':
+		{
+			long long int value = *((long long int*)t_property->data.data);
+			sprintf(temp, "%lli", value);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'F':
+		{
+			double value = (double)*((float*)t_property->data.data);
+			sprintf(temp, "%Lf.4", value);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'D':
+		{
+			double value = *((double*)t_property->data.data);
+			sprintf(temp, "%Lf.4", value);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'b':
+		{
+			fbx_array_property* array_property = (fbx_array_property*)t_property->data.data;
+			sprintf(temp, "bool_array[%i]", (int)array_property->length);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'i':
+		{
+			fbx_array_property* array_property = (fbx_array_property*)t_property->data.data;
+			sprintf(temp, "int_array[%i]", (int)array_property->length);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'f':
+		{
+			fbx_array_property* array_property = (fbx_array_property*)t_property->data.data;
+			sprintf(temp, "float_array[%i]", (int)array_property->length);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'l':
+		{
+			fbx_array_property* array_property = (fbx_array_property*)t_property->data.data;
+			sprintf(temp, "long_array[%i]", (int)array_property->length);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'd':
+		{
+			fbx_array_property* array_property = (fbx_array_property*)t_property->data.data;
+			sprintf(temp, "double_array[%i]", (int)array_property->length);
+			result = fbx_string_push(t_string, temp);
+		} break;
+		case 'S':
+		{
+			result = fbx_string_push(t_string, "\"");
+			if(!result)
+			{
+				return 0;
+			}
+			result = fbx_string_push_limit(t_string, ((char*)t_property->data.data), t_property->data.size);
+			if (!result)
+			{
+				return 0;
+			}
+			result = fbx_string_push(t_string, "\"");
+			if(!result)
+			{
+				return 0;
+			}
+			
+		} break;
+		case 'R':
+		{
+			result = fbx_string_push(t_string, "RAW_DATA");
+		} break;
+	}
+	return result;
+}
+
+int fbx_stringify_node(fbx_node_record* t_node, vector* t_nodes, vector* t_string, unsigned int t_should_stringify_properties)
 {
 	if (!t_node || !t_string)
 	{
@@ -703,117 +802,32 @@ int fbx_stringify_node(fbx_node_record* t_node, vector* t_nodes, vector* t_strin
 	
 	FBX_LOG("stringify properties");
 	
-	int i = 0;
-	for (; i < t_node->properties.element_count; ++i)
+	if (t_should_stringify_properties)
 	{
-		char temp[256];
-		if (i != 0)
+		int i = 0;
+		for (; i < t_node->properties.element_count; ++i)
 		{
-			result = fbx_string_push(t_string, temp);
+			if (i != 0)
+			{
+				result = vector_push(t_string, ",");
+				if (!result)
+				{
+					return 0;
+				}
+				result = vector_push(t_string, "\n");
+				if (!result)
+				{
+					return 0;
+				}
+			}
+			fbx_property* property = (fbx_property*)vector_get_index(&t_node->properties, i);
+			result = fbx_stringify_property(property, t_string);
 			if (!result)
 			{
 				return 0;
 			}
 		}
-		fbx_property* property = (fbx_property*)vector_get_index(&t_node->properties, i);
-		switch (property->typecode)
-		{
-			case 'C':
-			{
-				int value = (int)*((char*)property->data.data);
-				sprintf(temp, "%i", value);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'Y':
-			{
-				int value = (int)*((short*)property->data.data);
-				sprintf(temp, "%i", value);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'I':
-			{
-				int value = *((int*)property->data.data);
-				sprintf(temp, "%i", value);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'L':
-			{
-				long long int value = *((long long int*)property->data.data);
-				sprintf(temp, "%lli", value);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'F':
-			{
-				double value = (double)*((float*)property->data.data);
-				sprintf(temp, "%Lf.4", value);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'D':
-			{
-				double value = *((double*)property->data.data);
-				sprintf(temp, "%Lf.4", value);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'b':
-			{
-				fbx_array_property* array_property = (fbx_array_property*)property->data.data;
-				sprintf(temp, "bool_array[%i]", (int)array_property->length);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'i':
-			{
-				fbx_array_property* array_property = (fbx_array_property*)property->data.data;
-				sprintf(temp, "int_array[%i]", (int)array_property->length);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'f':
-			{
-				fbx_array_property* array_property = (fbx_array_property*)property->data.data;
-				sprintf(temp, "float_array[%i]", (int)array_property->length);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'l':
-			{
-				fbx_array_property* array_property = (fbx_array_property*)property->data.data;
-				sprintf(temp, "long_array[%i]", (int)array_property->length);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'd':
-			{
-				fbx_array_property* array_property = (fbx_array_property*)property->data.data;
-				sprintf(temp, "double_array[%i]", (int)array_property->length);
-				result = fbx_string_push(t_string, temp);
-			} break;
-			case 'S':
-			{
-				result = fbx_string_push(t_string, "\"");
-				if(!result)
-				{
-					return 0;
-				}
-				result = fbx_string_push_limit(t_string, ((char*)property->data.data), property->data.size);
-				if (!result)
-				{
-					return 0;
-				}
-				result = fbx_string_push(t_string, "\"");
-				if(!result)
-				{
-					return 0;
-				}
-				
-			} break;
-			case 'R':
-			{
-				result = fbx_string_push(t_string, "RAW_DATA");
-			} break;
-		}
-		if (!result)
-		{
-			return 0;
-		}
 	}
-	
 	
 	if (t_node->children.element_count)
 	{
@@ -822,12 +836,12 @@ int fbx_stringify_node(fbx_node_record* t_node, vector* t_nodes, vector* t_strin
 		{
 			return 0;
 		}
-		i = 0;
+		int i = 0;
 		for (; i < t_node->children.element_count; ++i)
 		{
 			unsigned int child_index = *((unsigned int*)vector_get_index(&t_node->children, i));
 			fbx_node_record* child = (fbx_node_record*)vector_get_index(t_nodes, child_index);
-			result = fbx_stringify_node(child, t_nodes, t_string);
+			result = fbx_stringify_node(child, t_nodes, t_string, t_should_stringify_properties);
 			if (!result)
 			{
 				return 0;
@@ -880,7 +894,62 @@ int fbx_stringify(fbx* t_fbx, buffer* t_out_buffer)
 		
 		node = (fbx_node_record*)vector_get_index(&t_fbx->nodes, *((int*)vector_get_index(&t_fbx->root_nodes, i)));
 		
-		result = fbx_stringify_node(node, &t_fbx->nodes, &string);
+		result = fbx_stringify_node(node, &t_fbx->nodes, &string, 1);
+		if (!result)
+		{
+			goto stringify_fail;
+		}
+	}
+	
+	FBX_LOG("stringify exiting record");
+	
+	char null_term = '\0';
+	result = vector_push(&string, &null_term);
+	
+	if (!result)
+	{
+stringify_fail:
+		FBX_LOG("stringify failed");
+		vector_final(&string);
+		return 0;
+	}
+	
+	*t_out_buffer = string.buffer;
+	
+	FBX_LOG("stringify exited");
+	
+	return 1;
+}
+
+int fbx_stringify_without_properties(fbx* t_fbx, buffer* t_out_buffer)
+{
+	if (!t_fbx || !t_out_buffer)
+	{
+		return 0;
+	}
+	
+	FBX_LOG("stringify entered");
+	
+	vector string;
+	int result = vector_init(&string, 1);
+	if (!result)
+	{
+		return 0;
+	}
+	
+	fbx_node_record* node = 0;
+	int i = 0;
+	
+	
+	FBX_LOG("stringify entering record");
+	
+	for (; i < t_fbx->root_nodes.element_count; ++i)
+	{
+		FBX_LOG("stringify element %i", i);
+		
+		node = (fbx_node_record*)vector_get_index(&t_fbx->nodes, *((int*)vector_get_index(&t_fbx->root_nodes, i)));
+		
+		result = fbx_stringify_node(node, &t_fbx->nodes, &string, 0);
 		if (!result)
 		{
 			goto stringify_fail;

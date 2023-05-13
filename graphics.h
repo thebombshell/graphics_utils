@@ -1,10 +1,12 @@
 
-#ifndef SMOL_GRAPHICS_H
-#define SMOL_GRAPHICS_H
+#ifndef GRAPHICS_UTILS_GRAPHICS_H
+#define GRAPHICS_UTILS_GRAPHICS_H
 
 #include <window.h>
 #include "glad.h"
+
 #include <data_structures.h>
+#include "fbx_import.h"
 
 /** @struct		graphics
  *	@brief		a struct containign graphical context information
